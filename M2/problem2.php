@@ -3,7 +3,7 @@ $a1 = [10.001, 11.591, 0.011, 5.991, 16.121, 0.131, 100.981, 1.001];
 $a2 = [1.99, 1.99, 0.99, 1.99, 0.99, 1.99, 0.99, 0.99];
 $a3 = [0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01];
 $a4 = [10.01, -12.22, 0.23, 19.20, -5.13, 3.12];
-function getTotal($arr) {
+function getTotal($arr) { // ss4589 2024-06-09
     echo "<br>Processing Array:<br><pre>" . var_export($arr, true) . "</pre>";
     $total = 0.00;
     //start edits
@@ -12,7 +12,7 @@ function getTotal($arr) {
     //TODO do rounding stuff here (round to two decimals i.e., 0.10, 0.01, 0.00)
     foreach ($arr as $value) {
         $total += $value;
-        $total = round($total, 2);
+        $total = sprintf("%.2f", $total);
     }
     //end edits
     echo "The total is $total";
