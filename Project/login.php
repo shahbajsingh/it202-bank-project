@@ -1,77 +1,73 @@
 <?php
 require(__DIR__ . "/partials/nav.php");
-?>
-<form onsubmit="return validate(this)" method="POST">
-    <div>
-        <label for="email">Email</label>
-        <input type="email" name="email" required />
-    </div>
-    <div>
-        <label for="pw">Password</label>
-        <input type="password" id="pw" name="password" required minlength="8" />
-    </div>
-    <input type="submit" value="Login" />
-</form>
-<script>
-    function validate(form) {
-        //TODO 1: implement JavaScript validation
-        //ensure it returns false for an error and true for success
 
-        return true;
-    }
-</script>
-<?php
-//TODO 2: add PHP Code
-if (isset($_POST["email"]) && isset($_POST["password"])) {
-    $email = se($_POST, "email", "", false);
-    $password = se($_POST, "password", "", false);
+$errors = [];
 
-    //TODO 3
-    $hasError = false;
-    if (empty($email)) {
-        echo "Email must not be empty";
-        $hasError = true;
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $username_or_email = trim($_POST['username_or_email']);
+    $password = $_POST['password'];
+
+    if (empty($username_or_email) || empty($password)) {
+        flash_message("Username/Email and password are required");
     }
-    //sanitize
-    $email = sanitize_email($email);
-    //validate
-    if (!is_valid_email($email)) {
-        echo "Invalid email address";
-        $hasError = true;
-    }
-    if (empty($password)) {
-        echo "password must not be empty";
-        $hasError = true;
-    }
-    if (strlen($password) < 8) {
-        echo "Password too short";
-        $hasError = true;
-    }
-    if (!$hasError) {
-        //TODO 4
+
+    if (empty($errors)) {
         $db = getDB();
-        $stmt = $db->prepare("SELECT email, password from Users where email = :email");
-        try {
-            $r = $stmt->execute([":email" => $email]);
-            if ($r) {
-                $user = $stmt->fetch(PDO::FETCH_ASSOC);
-                if ($user) {
-                    $hash = $user["password"];
-                    unset($user["password"]);
-                    if (password_verify($password, $hash)) {
-                        echo "Weclome $email";
-                        $_SESSION["user"] = $user;
-                        die(header("Location: home.php"));
-                    } else {
-                        echo "Invalid password";
-                    }
-                } else {
-                    echo "Email not found";
-                }
+        $stmt = $db->prepare("SELECT id, username, email, password FROM Users WHERE username = :username_or_email OR email = :username_or_email");
+        $stmt->execute([':username_or_email' => $username_or_email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($user) {
+            if (password_verify($password, $user['password'])) {
+                $_SESSION['user'] = $user; // Set session variable
+                flash_message("Login successful", 'success');
+                header("Location: home.php");
+                exit;
+            } else {
+                $errors[] = "Invalid password";
+                flash_message("Invalid password");
             }
-        } catch (Exception $e) {
-            echo "<pre>" . var_export($e, true) . "</pre>";
+        } else {
+            $errors[] = "Username/Email doesn't exist";
+            flash_message("Username/Email doesn't exist");
         }
     }
 }
 ?>
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Login</title>
+    <link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+
+<body>
+    <?php display_flash_messages(); ?>
+    <h1>Login</h1>
+    <form method="POST" action="login.php">
+        <label for="username_or_email">Username or Email:</label>
+        <input type="text" id="username_or_email" name="username_or_email" required>
+        <br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+        <br>
+        <button type="submit">Login</button>
+    </form>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const flashMessages = document.querySelectorAll('.flash-message');
+            flashMessages.forEach(function(message) {
+                setTimeout(function() {
+                    message.classList.add('show');
+                }, 1000);
+
+                setTimeout(function() {
+                    message.classList.remove('show');
+                }, 5100);
+            });
+        });
+    </script>
+</body>
+
+</html>
