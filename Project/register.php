@@ -1,84 +1,114 @@
 <?php
 require(__DIR__ . "/partials/nav.php");
-?>
-<form onsubmit="return validate(this)" method="POST">
-    <div>
-        <label for="email">Email</label>
-        <input type="email" name="email" required />
-    </div>
-    <div>
-        <label for="pw">Password</label>
-        <input type="password" id="pw" name="password" required minlength="8" />
-    </div>
-    <div>
-        <label for="confirm">Confirm</label>
-        <input type="password" name="confirm" required minlength="8" />
-    </div>
-    <input type="submit" value="Register" />
-</form>
-<script>
-    function validate(form) {
-        //TODO 1: implement JavaScript validation
-        //ensure it returns false for an error and true for success
 
-        return true;
+$errors = [];
+$success = false;
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $username = trim($_POST['username']);
+    $email = trim($_POST['email']);
+    $password = $_POST['password'];
+    $confirm_password = $_POST['confirm_password'];
+
+    if (empty($username)) {
+        $errors[] = "Username is required";
+        flash_message("Username is required");
     }
-</script>
-<?php
-//TODO 2: add PHP Code
-if (isset($_POST["email"]) && isset($_POST["password"]) && isset($_POST["confirm"])) {
-    $email = se($_POST, "email", "", false);
-    $password = se($_POST, "password", "", false);
-    $confirm = se(
-        $_POST,
-        "confirm",
-        "",
-        false
-    );
-    //TODO 3
-    $hasError = false;
-    if (empty($email)) {
-        echo "Email must not be empty";
-        $hasError = true;
+
+    if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Valid email is required";
+        flash_message("Valid email is required");
     }
-    //sanitize
-    $email = sanitize_email($email);
-    //validate
-    if (!is_valid_email($email)) {
-        echo "Invalid email address";
-        $hasError = true;
-    }
+
     if (empty($password)) {
-        echo "password must not be empty";
-        $hasError = true;
+        $errors[] = "Password is required";
+        flash_message("Password is required");
+    } elseif (strlen($password) < 8) {
+        $errors[] = "Password must be at least 8 characters long";
+        flash_message("Password must be at least 8 characters long");
     }
-    if (empty($confirm)) {
-        echo "Confirm password must not be empty";
-        $hasError = true;
+
+    if ($password !== $confirm_password) {
+        $errors[] = "Passwords do not match";
+        flash_message("Passwords do not match");
     }
-    if (strlen($password) < 8) {
-        echo "Password too short";
-        $hasError = true;
+
+    $db = getDB();
+    // Check for duplicate username
+    $stmt = $db->prepare("SELECT id FROM Users WHERE username = :username");
+    $stmt->execute([':username' => $username]);
+    $existing_user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($existing_user) {
+        $errors[] = "Username is already taken";
+        flash_message("Username is already taken");
     }
-    if (
-        strlen($password) > 0 && $password !== $confirm
-    ) {
-        echo "Passwords must match";
-        $hasError = true;
+
+    // Check for duplicate email
+    $stmt = $db->prepare("SELECT id FROM Users WHERE email = :email");
+    $stmt->execute([':email' => $email]);
+    $existing_user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($existing_user) {
+        $errors[] = "Email is already taken";
+        flash_message("Email is already taken");
     }
-    if (!$hasError) {
-        echo "Welcome, $email";
-        //TODO 4
-        $hash = password_hash($password, PASSWORD_BCRYPT);
-        $db = getDB();
-        $stmt = $db->prepare("INSERT INTO Users (email, password) VALUES(:email, :password)");
-        try {
-            $stmt->execute([":email" => $email, ":password" => $hash]);
-            echo "Successfully registered!";
-        } catch (Exception $e) {
-            echo "There was a problem registering";
-            "<pre>" . var_export($e, true) . "</pre>";
+
+    if (empty($errors)) {
+        $hashed_password = password_hash($password, PASSWORD_BCRYPT);
+        $stmt = $db->prepare("INSERT INTO Users (username, email, password, created, modified) VALUES (:username, :email, :password, NOW(), NOW())");
+        $success = $stmt->execute([':username' => $username, ':email' => $email, ':password' => $hashed_password]);
+
+        if ($success) {
+            flash_message("Registration successful", 'success');
+            header("Location: login.php");
+            exit;
+        } else {
+            flash_message("An error occurred during registration");
         }
     }
 }
 ?>
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Register</title>
+    <link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+
+<body>
+    <?php display_flash_messages(); ?>
+    <h1>Register</h1>
+    <form method="POST" action="register.php">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" value="<?php echo htmlspecialchars($username ?? ''); ?>" required>
+        <br>
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($email ?? ''); ?>" required>
+        <br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+        <br>
+        <label for="confirm_password">Confirm Password:</label>
+        <input type="password" id="confirm_password" name="confirm_password" required>
+        <br>
+        <button type="submit">Register</button>
+    </form>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const flashMessages = document.querySelectorAll('.flash-message');
+            flashMessages.forEach(function(message) {
+                setTimeout(function() {
+                    message.classList.add('show');
+                }, 1000);
+
+                setTimeout(function() {
+                    message.classList.remove('show');
+                }, 5100);
+            });
+        });
+    </script>
+</body>
+
+</html>
